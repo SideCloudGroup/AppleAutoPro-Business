@@ -1,7 +1,6 @@
 services:
   php-fpm:
     image: pplulee/sidetp:latest
-    container_name: appleautopro-php
     volumes:
       - ./web:/var/www/html
       - .env:/var/www/html/.env
@@ -11,25 +10,48 @@ services:
         condition: service_healthy
     networks:
       - appleautopro-network
+    healthcheck:
+      test: ["CMD", "test", "-f", "/var/run/php/php-fpm.pid"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     restart: always
+
+#  caddy:
+#    image: caddy:latest
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    volumes:
+#      - ./data/Caddyfile:/etc/caddy/Caddyfile
+#      - ./data/caddy/data:/data
+#      - ./data/caddy:/config
+#      - ./web:/var/www/html
+#    depends_on:
+#      php-fpm:
+#        condition: service_healthy
+#    networks:
+#      - appleautopro-network
+#    restart: always
 
   nginx:
     image: nginx:latest
-    container_name: appleautopro-nginx
     ports:
       - "127.0.0.1:${WEB_PORT}:80"
+      - "[::1]:${WEB_PORT}:80"
     volumes:
       - ./data/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./web:/var/www/html
     depends_on:
-      - php-fpm
+      php-fpm:
+        condition: service_healthy
     networks:
       - appleautopro-network
     restart: always
 
   redis:
     image: redis:latest
-    container_name: appleautopro-redis
     volumes:
       - ./data/redis:/data
     networks:
@@ -38,7 +60,6 @@ services:
 
   mariadb:
     image: mariadb:latest
-    container_name: appleautopro-mariadb
     env_file:
       - .env
     volumes:
@@ -53,12 +74,13 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
-
   backend:
     image: pplulee/appleautopro:v4
-    container_name: appleautopro-backend
+    env_file:
+      - .env
     depends_on:
-      - php-fpm
+      php-fpm:
+        condition: service_healthy
     networks:
       - appleautopro-network
     restart: always
